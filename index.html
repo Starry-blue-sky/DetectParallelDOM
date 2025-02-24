@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>并行DOM测试</title>
+    <style>
+        .dom-container {
+            display: flex;
+            gap: 20px;
+        }
+        .dom-view {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 45%;
+        }
+        .actions {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="actions">
+        <button onclick="addNode()">添加节点</button>
+        <button onclick="swapText()">修改文本</button>
+        <button onclick="showProps()">显示属性</button>
+    </div>
+    
+    <div class="dom-container">
+        <!-- 原始DOM视图 -->
+        <div class="dom-view">
+            <h3>原始DOM结构</h3>
+            <div id="original-root"></div>
+            <pre id="original-output"></pre>
+        </div>
+        
+        <!-- 并行DOM视图 -->
+        <div class="dom-view">
+            <h3>并行DOM结构</h3>
+            <div id="parallel-root"></div>
+            <pre id="parallel-output"></pre>
+        </div>
+    </div>
+
+<script>
+// 初始化并行DOM
+const parallelDOM = document.implementation.createHTMLDocument();
+document.getElementById('parallel-root').appendChild(parallelDOM.documentElement.cloneNode(true));
+
+// 保持测试节点简单结构
+const originalRoot = document.getElementById('original-root');
+const parallelRoot = parallelDOM.getElementById('parallel-root');
+
+// 节点操作函数
+function addNode() {
+    const newNode = document.createElement('div');
+    newNode.textContent = '新节点';
+    originalRoot.appendChild(newNode);
+    updateViews();
+}
+
+function swapText() {
+    const nodes = originalRoot.childNodes;
+    if(nodes.length > 0) {
+        nodes[0].textContent = '修改后的文本-' + Date.now();
+    }
+    updateViews();
+}
+
+function showProps() {
+    const output = [];
+    const node = originalRoot.firstChild;
+    
+    if(node) {
+        output.push('节点属性验证:');
+        output.push(`parentElement: ${node.parentElement?.id}`);
+        output.push(`nextSibling: ${node.nextSibling?.nodeName}`);
+        output.push(`textContent: ${node.textContent}`);
+    }
+    
+    document.getElementById('original-output').textContent = output.join('\n');
+}
+
+// 更新视图
+function updateViews() {
+    // 原始DOM结构
+    document.getElementById('original-output').textContent = 
+        originalRoot.innerHTML.replace(/</g, '\n<');
+    
+    // 并行DOM结构
+    document.getElementById('parallel-output').textContent = 
+        parallelRoot.innerHTML.replace(/</g, '\n<');
+}
+
+// 初始状态
+updateViews();
+</script>
+</body>
+</html>
