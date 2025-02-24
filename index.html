@@ -1,86 +1,147 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>并行DOM验证器</title>
+    <title>SHELTER 防护系统测试页</title>
     <style>
-        .log { 
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin: 10px 0;
-            height: 200px;
-            overflow-y: auto;
-        }
+        .test-section { margin: 20px; padding: 15px; border: 1px solid #ccc; }
+        .test-result { padding: 10px; margin: 5px 0; }
+        .success { background: #dfffdf; color: #2b532b; }
+        .failure { background: #ffe5e5; color: #8b0000; }
     </style>
 </head>
 <body>
-    <div id="testArea">
-        <button onclick="testNodeOperation()">测试节点操作</button>
-        <button onclick="testDocumentAccess()">测试document访问</button>
-        <button onclick="testDisconnectedNode()">测试游离节点</button>
-    </div>
+    <h1>防护系统功能测试</h1>
     
-    <div class="log" id="accessLog"></div>
-    <div class="log" id="structureLog"></div>
+    <!-- 测试用例容器 -->
+    <div class="test-section" id="basic-tests">
+        <h2>基础功能测试</h2>
+        <button onclick="runBasicTests()">执行基础测试</button>
+        <div id="test-results"></div>
+    </div>
+
+    <!-- 指纹混淆测试 -->
+    <div class="test-section" id="fingerprint-tests">
+        <h2>指纹混淆测试</h2>
+        <button onclick="runFingerprintTests()">执行指纹测试</button>
+        <div id="fingerprint-results"></div>
+    </div>
+
+    <!-- 动态注入测试 -->
+    <div id="dynamic-injection"></div>
 
 <script>
-// 初始化日志系统
-const accessLog = document.getElementById('accessLog');
-const structureLog = document.getElementById('structureLog');
+// 基础功能测试套件
+function runBasicTests() {
+    const results = document.getElementById('test-results');
+    results.innerHTML = '';
 
-// 在你的Node.js拦截代码中添加日志记录（模拟）
-const originalConsoleLog = console.log;
-console.log = function(...args) {
-    if(args[0].includes('node.') && args[0].includes('_getter')) {
-        accessLog.innerHTML += `[属性路由] ${args[0]} ${new Date().toLocaleTimeString()}<br>`;
-    }
-    originalConsoleLog.apply(console, args);
-};
+    // 测试1: 平行DOM存在性检查
+    setTimeout(() => { // 等待初始化完成
+        testCase({
+            name: '平行DOM初始化',
+            assert: () => document.documentElement.hasAttribute('data-parallel-dom'),
+            resultElem: results
+        });
 
-// 测试用例
-function testNodeOperation() {
-    const div = document.createElement('div');
-    div.innerHTML = `
-        <parent>
-            <child id="first">原始文本</child>
-            <child id="second"></child>
-        </parent>
-    `;
-    
-    document.body.appendChild(div);
-    updateStructureLog('节点操作后结构');
+        // 测试2: ID自动生成检查
+        testCase({
+            name: '元素ID生成',
+            assert: () => {
+                const testElem = document.createElement('div');
+                document.body.appendChild(testElem);
+                return testElem.id.startsWith('id-');
+            },
+            cleanup: () => testElem.remove(),
+            resultElem: results
+        });
+
+        // 测试3: 原生API覆写检查
+        testCase({
+            name: 'API覆写检测',
+            assert: () => {
+                const originalAppend = Node.prototype.appendChild;
+                return originalAppend.toString() !== nativeAppend.toString();
+            },
+            resultElem: results
+        });
+    }, 500);
 }
 
-function testDocumentAccess() {
-    const props = ['documentElement', 'body', 'head'];
-    let output = 'document属性访问测试:<br>';
-    
-    props.forEach(prop => {
-        output += `${prop}: ${JSON.stringify(document[prop].tagName)}<br>`;
+// 指纹测试套件
+function runFingerprintTests() {
+    const results = document.getElementById('fingerprint-results');
+    results.innerHTML = '';
+
+    // 测试1: Canvas指纹混淆
+    testCase({
+        name: 'Canvas指纹混淆',
+        assert: () => {
+            const canvas = document.createElement('canvas');
+            return canvas.toDataURL() !== cleanCanvas.toDataURL();
+        },
+        resultElem: results
     });
-    
-    accessLog.innerHTML += output;
+
+    // 测试2: WebGL特征混淆
+    testCase({
+        name: 'WebGL混淆',
+        assert: async () => {
+            const renderer = await getWebGLRenderer();
+            return renderer.includes('[protected]');
+        },
+        resultElem: results
+    });
+
+    // 测试3: AudioContext指纹
+    testCase({
+        name: '音频指纹保护',
+        assert: () => {
+            const ctx = new AudioContext();
+            return ctx.destination.channelCount !== 2;
+        },
+        resultElem: results
+    });
 }
 
-function testDisconnectedNode() {
-    const node = document.createElement('div');
-    node.textContent = "游离节点";
-    accessLog.innerHTML += `游离节点parentElement: ${node.parentElement}<br>`;
-}
-
-function updateStructureLog(action) {
-    const walker = document.createTreeWalker(document, NodeFilter.SHOW_ALL);
-    let structure = '';
+// 通用测试用例执行器
+function testCase({name, assert, cleanup, resultElem}) {
+    const result = document.createElement('div');
+    result.className = 'test-result';
     
-    while(walker.nextNode()) {
-        const node = walker.currentNode;
-        structure += `${'  '.repeat(node.depth)}${node.nodeName}${node.id ? `#${node.id}` : ''}<br>`;
+    try {
+        const testResult = assert();
+        result.classList.add(testResult ? 'success' : 'failure');
+        result.textContent = `${name}: ${testResult ? '成功' : '失败'}`;
+        
+        if (typeof cleanup === 'function') cleanup();
+    } catch (e) {
+        result.classList.add('failure');
+        result.textContent = `${name}: 错误 - ${e.message}`;
     }
     
-    structureLog.innerHTML = `${action}结构：<br>${structure}`;
+    resultElem.appendChild(result);
+    result.scrollIntoView({behavior: 'smooth'});
 }
 
-// 初始化时记录
-updateStructureLog('初始');
+// 辅助函数：获取WebGL渲染器信息
+async function getWebGLRenderer() {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl');
+    return gl.getParameter(gl.RENDERER);
+}
+
+// 初始化防护系统
+const script = document.createElement('script');
+script.src = 'path/to/your/shelter.js'; // 替换为实际路径
+document.head.appendChild(script);
+
+// 启动自动测试
+script.onload = () => {
+    setTimeout(() => {
+        runBasicTests();
+        runFingerprintTests();
+    }, 1000);
+};
 </script>
 </body>
-</html>
+</html> 
