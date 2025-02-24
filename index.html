@@ -130,18 +130,165 @@ async function getWebGLRenderer() {
     return gl.getParameter(gl.RENDERER);
 }
 
-// 初始化防护系统
-const script = document.createElement('script');
-script.src = 'path/to/your/shelter.js'; // 替换为实际路径
-document.head.appendChild(script);
+// 平行DOM验证测试套件
+async function runParallelDOMTests() {
+    const testResults = {
+        total: 0,
+        passed: 0,
+        failed: 0,
+        details: []
+    };
 
-// 启动自动测试
-script.onload = () => {
-    setTimeout(() => {
-        runBasicTests();
-        runFingerprintTests();
-    }, 1000);
-};
+    // 等待防护系统初始化
+    await waitForInitialization();
+
+    // 执行核心测试用例
+    await testCloneConsistency(testResults);
+    await testIDGeneration(testResults);
+    await testAPIConsistency(testResults);
+    await testMutationHandling(testResults);
+
+    // 输出格式化测试报告
+    console.log('%c=== 平行DOM测试报告 ===', 'font-size: 18px; color: #1a73e8');
+    console.table(testResults.details);
+    alert(`测试完成：${testResults.passed}/${testResults.total} 通过`);
+}
+
+// 等待防护系统初始化的工具函数
+function waitForInitialization() {
+    return new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+            if (window.__parallelDOMReady && parallelDOM) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 100);
+    });
+}
+
+// 测试用例1：DOM结构克隆一致性
+async function testCloneConsistency(results) {
+    const testName = 'DOM结构一致性';
+    try {
+        const originalCount = document.getElementsByTagName('*').length;
+        const parallelCount = parallelDOM.getElementsByTagName('*').length;
+        
+        assertEqual(originalCount, parallelCount, '节点数量一致', testName, results);
+        assertEqual(document.documentElement.attributes.length, 
+                   parallelDOM.documentElement.attributes.length, 
+                   '属性数量一致', testName, results);
+        
+        // 深度检查body结构
+        const originalBody = document.body.innerHTML;
+        const parallelBody = parallelDOM.body.innerHTML;
+        assertEqual(originalBody, parallelBody, 'Body内容一致', testName, results);
+        
+    } catch (error) {
+        recordResult(false, testName, error.message, results);
+    }
+}
+
+// 测试用例2：ID生成系统
+async function testIDGeneration(results) {
+    const testName = 'ID生成验证';
+    const testElem = document.createElement('div');
+    document.body.appendChild(testElem);
+
+    try {
+        // 检查ID格式
+        const idPattern = /^[a-zA-Z0-9]{10}\d+$/;
+        assertEqual(true, idPattern.test(testElem.id), 'ID格式正确', testName, results);
+
+        // 检查并行DOM中的对应ID
+        const parallelElem = parallelDOM.getElementById(testElem.id);
+        assertEqual(true, !!parallelElem, 'ID映射存在', testName, results);
+        assertEqual(testElem.tagName, parallelElem.tagName, '标签名称一致', testName, results);
+
+    } finally {
+        testElem.remove();
+    }
+}
+
+// 测试用例3：API操作一致性
+async function testAPIConsistency(results) {
+    const testName = 'API操作验证';
+    const testElem = document.createElement('div');
+    testElem.textContent = 'TEST';
+    
+    try {
+        // 原始操作
+        document.body.appendChild(testElem);
+        const originalHTML = document.body.innerHTML;
+        
+        // 并行DOM验证
+        const parallelBodyHTML = parallelDOM.body.innerHTML;
+        assertEqual(originalHTML, parallelBodyHTML, '追加节点同步', testName, results);
+
+        // 删除操作
+        document.body.removeChild(testElem);
+        assertEqual(false, parallelDOM.body.contains(testElem), '删除节点同步', testName, results);
+
+    } finally {
+        if (testElem.parentNode) testElem.parentNode.removeChild(testElem);
+    }
+}
+
+// 测试用例4：DOM变更处理
+async function testMutationHandling(results) {
+    const testName = 'DOM变更处理';
+    const dynamicElem = document.createElement('div');
+    dynamicElem.className = 'dynamic-test';
+
+    try {
+        // 添加节点
+        document.body.appendChild(dynamicElem);
+        await waitForMutation();
+        
+        const parallelElem = parallelDOM.querySelector('.dynamic-test');
+        assertEqual(true, !!parallelElem, '动态添加节点同步', testName, results);
+
+        // 修改属性
+        dynamicElem.id = 'dynamic-test-id';
+        await waitForMutation();
+        
+        const parallelID = parallelElem.id;
+        assertEqual('dynamic-test-id', parallelID, '属性修改同步', testName, results);
+
+        // 删除节点
+        dynamicElem.remove();
+        await waitForMutation();
+        
+        assertEqual(false, parallelDOM.contains(parallelElem), '节点删除同步', testName, results);
+
+    } finally {
+        if (dynamicElem.parentNode) dynamicElem.parentNode.removeChild(dynamicElem);
+    }
+}
+
+// 辅助断言函数
+function assertEqual(expected, actual, message, testName, results) {
+    const success = expected === actual;
+    results.total++;
+    if (success) {
+        results.passed++;
+        results.details.push({ 测试项: testName, 状态: '通过', 详情: message });
+    } else {
+        results.failed++;
+        results.details.push({ 
+            测试项: testName, 
+            状态: '失败', 
+            详情: `${message} (预期: ${expected}, 实际: ${actual})`
+        });
+    }
+}
+
+// Mutation观察等待
+function waitForMutation() {
+    return new Promise(resolve => setTimeout(resolve, 100));
+}
+
+// 启动测试
+setTimeout(runParallelDOMTests, 2000); // 等待Puppeteer注入完成
 </script>
 </body>
 </html> 
